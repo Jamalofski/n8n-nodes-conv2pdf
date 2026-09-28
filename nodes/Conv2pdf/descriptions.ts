@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-export type FileResource = 'document' | 'image' | 'pdf';
+export type FileResource = 'document' | 'ebook' | 'image' | 'pdf';
 
 export interface OperationSpec {
 	/** The conv2pdf tool behind the operation: the `:tool` of POST /v1/convert/:tool. */
@@ -18,7 +18,15 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 			tool: 'office-to-pdf',
 			name: 'Convert to PDF',
 			action: 'Convert an Office document to PDF',
-			description: 'Convert a Word, Excel, PowerPoint or OpenDocument file to PDF',
+			description: 'Convert a Word, Excel, PowerPoint, OpenDocument or Apple Pages file to PDF',
+		},
+	},
+	ebook: {
+		convertToPdf: {
+			tool: 'epub-to-pdf',
+			name: 'Convert to PDF',
+			action: 'Convert an e-book to PDF',
+			description: 'Convert an EPUB e-book to PDF, with its table of contents and links',
 		},
 	},
 	image: {
@@ -105,8 +113,20 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 	},
 };
 
+/** The PDF operations whose tool opens a protected PDF when it gets its password. */
+export const PDF_PASSWORD_OPERATIONS = [
+	'addPageNumbers',
+	'addWatermark',
+	'compress',
+	'convertToImages',
+	'convertToWord',
+	'extractPages',
+	'rotate',
+];
+
 const RESOURCE_OPTIONS = [
 	{ name: 'Office Document', value: 'document' },
+	{ name: 'E-Book', value: 'ebook' },
 	{ name: 'Image', value: 'image' },
 	{ name: 'PDF', value: 'pdf' },
 	{ name: 'Account', value: 'account' },
@@ -128,6 +148,7 @@ const show = (resource: FileResource, operation: string[]) => ({
 // Every file operation reads one binary field, except Merge, which has its own inputs.
 const SINGLE_FILE_OPERATIONS: Array<[FileResource, string[]]> = [
 	['document', Object.keys(OPERATIONS.document)],
+	['ebook', Object.keys(OPERATIONS.ebook)],
 	['image', Object.keys(OPERATIONS.image)],
 	['pdf', Object.keys(OPERATIONS.pdf).filter((operation) => operation !== 'merge')],
 ];
@@ -148,6 +169,15 @@ export const properties: INodeProperties[] = [
 		noDataExpression: true,
 		displayOptions: { show: { resource: ['document'] } },
 		options: operationOptions('document'),
+		default: 'convertToPdf',
+	},
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['ebook'] } },
+		options: operationOptions('ebook'),
 		default: 'convertToPdf',
 	},
 	{
@@ -272,7 +302,7 @@ export const properties: INodeProperties[] = [
 		typeOptions: { password: true },
 		required: true,
 		default: '',
-		description: 'The password to set, from 4 to 64 characters',
+		description: 'The password to set, from 6 to 64 characters',
 		displayOptions: show('pdf', ['protect']),
 	},
 	{
@@ -306,9 +336,9 @@ export const properties: INodeProperties[] = [
 		name: 'password',
 		type: 'string',
 		typeOptions: { password: true },
-		required: true,
 		default: '',
-		description: 'The current password of the PDF',
+		description:
+			'The current password of the PDF. Leave it empty for a PDF that opens without a password but restricts printing or copying.',
 		displayOptions: show('pdf', ['unlock']),
 	},
 
@@ -344,7 +374,7 @@ export const properties: INodeProperties[] = [
 		name: 'numberFormat',
 		type: 'options',
 		options: [
-			{ name: 'Page X of N', value: 'full' },
+			{ name: 'Page Number and Total (3 / 12)', value: 'full' },
 			{ name: 'Page Number Only', value: 'simple' },
 		],
 		default: 'full',
@@ -391,6 +421,15 @@ export const properties: INodeProperties[] = [
 				default: true,
 				description:
 					'Whether to delete the job and its file from conv2pdf once the node has downloaded the result. Otherwise conv2pdf deletes them after one hour.',
+			},
+			{
+				displayName: 'PDF Password',
+				name: 'pdfPassword',
+				type: 'string',
+				typeOptions: { password: true },
+				default: '',
+				description: 'The password of a PDF that asks for one to open. The result has no password.',
+				displayOptions: { show: { '/resource': ['pdf'], '/operation': PDF_PASSWORD_OPERATIONS } },
 			},
 			{
 				displayName: 'Put Output File in Field',

@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.1.0 (unreleased)
+
+- **E-Book > Convert to PDF** converts an EPUB e-book to PDF on A4 pages, with its table of contents and links.
+- **Office Document > Convert to PDF** also converts Apple Pages documents.
+- **Options > PDF Password** opens a PDF that asks for a password on Add Page Numbers, Add Watermark, Compress, Convert to Images, Convert to Word, Extract Pages and Rotate.
+- **PDF > Unlock** takes an empty password, for a PDF that only restricts printing or copying.
+- The Protect password needs 6 characters, as the API requires. A missing PDF password, a DRM-protected e-book and a Numbers or Keynote file get their own messages.
+
 ## 1.0.1 (2026-10-09)
 
 - The codex file names the node by its full identifier, `n8n-nodes-conv2pdf.conv2pdf`, as n8n's review asks. No change to the node itself.

@@ -1,6 +1,6 @@
 # n8n-nodes-conv2pdf
 
-Official [n8n](https://n8n.io) node for the [conv2pdf API](https://conv2pdf.com/en/api/): convert Word, Excel, PowerPoint and images to PDF, convert PDF to Word, and merge, split, compress, protect, rotate or number PDFs, straight from your workflows. Processing runs on OVH servers in Gravelines, France: no transfer outside the EU, no US service in the chain.
+Official [n8n](https://n8n.io) node for the [conv2pdf API](https://conv2pdf.com/en/api/): convert Word, Excel, PowerPoint, Pages, images and e-books to PDF, convert PDF to Word, and merge, split, compress, protect, rotate or number PDFs, straight from your workflows. Processing runs on OVH servers in Gravelines, France: no transfer outside the EU, no US service in the chain.
 
 [Installation](#installation) · [Operations](#operations) · [Credentials](#credentials) · [Usage](#usage) · [Output](#output) · [Compatibility](#compatibility) · [Resources](#resources)
 
@@ -12,11 +12,12 @@ Follow the [community nodes installation guide](https://docs.n8n.io/integrations
 
 | Resource | Operation | What it does |
 |---|---|---|
-| Office Document | Convert to PDF | Word, Excel, PowerPoint or OpenDocument file to PDF |
+| Office Document | Convert to PDF | Word, Excel, PowerPoint, OpenDocument or Apple Pages file to PDF |
+| E-Book | Convert to PDF | EPUB e-book to PDF on A4 pages, with its table of contents and links |
 | Image | Convert to PDF | PNG, JPG, WebP, GIF or TIFF image to PDF |
 | Image | Convert HEIC to JPG | iPhone HEIC or HEIF photo to JPG |
 | Image | Convert HEIC to PDF | iPhone HEIC or HEIF photo to PDF |
-| PDF | Add Page Numbers | Number the pages, as "X of N" or "X", bottom center, left or right |
+| PDF | Add Page Numbers | Number the pages, as "3 / 12" or "3", bottom center, left or right |
 | PDF | Add Watermark | Stamp a text of up to 50 characters on every page |
 | PDF | Compress | Reduce the size, keeping images at 72, 150 or 300 DPI |
 | PDF | Convert to Images | One PNG or JPG per page, in a ZIP file |
@@ -25,7 +26,7 @@ Follow the [community nodes installation guide](https://docs.n8n.io/integrations
 | PDF | Merge | Combine several PDFs into one |
 | PDF | Protect | Set a password, and optionally forbid printing or copying |
 | PDF | Rotate | Turn every page by 90, 180 or 270 degrees |
-| PDF | Unlock | Remove a password you know |
+| PDF | Unlock | Remove a password you know, or the printing and copying restrictions |
 | Account | Get Quota | Plan, usage and limits of the API key |
 
 ## Credentials
@@ -37,6 +38,8 @@ Follow the [community nodes installation guide](https://docs.n8n.io/integrations
 ## Usage
 
 - **Input file.** Each operation reads the file from a binary field of the input item, `data` by default, as produced by the Read Files, HTTP Request or Google Drive nodes. conv2pdf checks the content of the file, not its name.
+- **Protected PDFs.** Add Page Numbers, Add Watermark, Compress, Convert to Images, Convert to Word, Extract Pages and Rotate open a PDF that asks for a password when you give it in **Options > PDF Password**. The result has no password. For Merge, unlock the protected PDFs first.
+- **Pages and Numbers.** A Pages document keeps its `.pages` name in the binary field: only the name tells it from a Numbers spreadsheet, which conv2pdf does not convert, like Keynote presentations.
 - **Merge.** In *One File per Input Item* mode, the node merges the file of every input item, in order, into a single PDF. In *Several Files in Each Item* mode, it merges the binary fields you list, such as `data, data_1`, into one PDF per item. The Dev plan merges 2 files at a time, paid plans up to 20.
 - **Result.** The converted file comes out in the `data` binary field, or the one set in **Options**. The node then deletes the job from conv2pdf; turn **Delete From Server After Download** off to keep it, and conv2pdf deletes it after one hour.
 - **Limits.** Files can weigh up to 10 MB on the Dev plan and 200 MB on paid plans. The API accepts 20 conversions per minute per API key: when it asks to slow down, or when its queue is full, the node waits for the delay the API gives (`Retry-After`) and tries again, up to five times.

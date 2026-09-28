@@ -6,6 +6,7 @@ const assert = require('node:assert/strict');
 
 const { Conv2pdf } = require('../dist/nodes/Conv2pdf/Conv2pdf.node.js');
 const { fileNameFromDisposition } = require('../dist/nodes/Conv2pdf/transport.js');
+const { OPERATIONS } = require('../dist/nodes/Conv2pdf/descriptions.js');
 const { version } = require('../package.json');
 
 const NODE = {
@@ -155,6 +156,23 @@ test('maps each operation to its conv2pdf tool and fields', async () => {
 		[{ resource: 'pdf', operation: 'convertToImages', imageFormat: 'jpg' }, 'pdf-to-image', { format: 'jpg' }],
 		[{ resource: 'pdf', operation: 'convertToWord' }, 'pdf-to-word', {}],
 		[{ resource: 'pdf', operation: 'unlock', password: 'old' }, 'unlock-pdf', { password: 'old' }],
+		[{ resource: 'pdf', operation: 'unlock', password: '' }, 'unlock-pdf', {}],
+		[
+			{ resource: 'pdf', operation: 'compress', quality: 'low', options: { pdfPassword: 'open sesame' } },
+			'compress-pdf',
+			{ quality: 'low', password: 'open sesame' },
+		],
+		[
+			{ resource: 'pdf', operation: 'convertToWord', options: { pdfPassword: 'open sesame' } },
+			'pdf-to-word',
+			{ password: 'open sesame' },
+		],
+		[
+			{ resource: 'pdf', operation: 'protect', password: 'new-password', options: { pdfPassword: 'ignored' } },
+			'protect-pdf',
+			{ password: 'new-password' },
+		],
+		[{ resource: 'ebook', operation: 'convertToPdf' }, 'epub-to-pdf', {}],
 		[{ resource: 'image', operation: 'convertToPdf' }, 'image-to-pdf', {}],
 		[{ resource: 'image', operation: 'heicToJpg' }, 'heic-to-jpg', {}],
 		[{ resource: 'image', operation: 'heicToPdf' }, 'heic-to-pdf', {}],
@@ -276,8 +294,55 @@ test('a file error only fails its own item', async () => {
 	});
 	const output = await promise;
 
-	assert.equal(output[0].json.error, 'The PDF is protected with a password');
+	assert.equal(output[0].json.error, 'The PDF asks for a password to open');
 	assert.equal(output[1].json.job_id, 'job1');
+});
+
+test('shows the input binary field on every operation that reads one file', () => {
+	const fields = new Conv2pdf().description.properties.filter(
+		(property) => property.name === 'binaryPropertyName' && !property.displayOptions.show.mergeMode,
+	);
+	for (const [resource, operations] of Object.entries(OPERATIONS)) {
+		for (const operation of Object.keys(operations).filter((name) => name !== 'merge')) {
+			const shown = fields.some(
+				(field) =>
+					field.displayOptions.show.resource.includes(resource) &&
+					field.displayOptions.show.operation.includes(operation),
+			);
+			assert.ok(shown, `${resource} > ${operation}`);
+		}
+	}
+});
+
+test('offers the PDF password only on the operations whose tool opens a protected PDF', () => {
+	const options = new Conv2pdf().description.properties.find((property) => property.name === 'options');
+	const pdfPassword = options.options.find((option) => option.name === 'pdfPassword');
+
+	assert.equal(pdfPassword.typeOptions.password, true);
+	assert.deepEqual(pdfPassword.displayOptions.show['/resource'], ['pdf']);
+	assert.deepEqual(pdfPassword.displayOptions.show['/operation'], [
+		'addPageNumbers',
+		'addWatermark',
+		'compress',
+		'convertToImages',
+		'convertToWord',
+		'extractPages',
+		'rotate',
+	]);
+});
+
+test('explains a Numbers file, which conv2pdf does not convert', async () => {
+	const { promise } = run({
+		files: [['budget.numbers']],
+		parameters: { resource: 'document', operation: 'convertToPdf', binaryPropertyName: 'data' },
+		respond: () => json(415, { error: 'unsupported_content', detected_type: 'iwork_numbers', plan: 'dev' }),
+	});
+
+	await assert.rejects(promise, (error) => {
+		assert.equal(error.message, 'The file does not match this operation');
+		assert.match(error.description, /Numbers spreadsheet/);
+		return true;
+	});
 });
 
 test('stops at the first network failure', async () => {

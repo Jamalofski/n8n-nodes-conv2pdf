@@ -9,7 +9,7 @@ import type {
 } from 'n8n-workflow';
 import { NodeApiError, NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { OPERATIONS, properties, type FileResource } from './descriptions';
+import { OPERATIONS, PDF_PASSWORD_OPERATIONS, properties, type FileResource } from './descriptions';
 import {
 	apiError,
 	conv2pdfRequest,
@@ -31,6 +31,7 @@ interface InputFile {
 interface ConvertOptions {
 	deleteAfterDownload?: boolean;
 	outputBinaryPropertyName?: string;
+	pdfPassword?: string;
 }
 
 async function readFile(
@@ -62,8 +63,11 @@ function toolFields(this: IExecuteFunctions, operation: string, itemIndex: numbe
 				...(restrictions.preventCopy ? { prevent_copy: 'on' } : {}),
 			};
 		}
-		case 'unlock':
-			return { password: this.getNodeParameter('password', itemIndex) as string };
+		case 'unlock': {
+			// Empty for a PDF that only restricts printing or copying.
+			const password = this.getNodeParameter('password', itemIndex, '') as string;
+			return password ? { password } : {};
+		}
 		case 'rotate':
 			return { rotation: this.getNodeParameter('rotation', itemIndex) as string };
 		case 'addWatermark':
@@ -142,7 +146,7 @@ export class Conv2pdf implements INodeType {
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description:
-			'Convert and edit PDFs with the conv2pdf API: Office documents and images to PDF, PDF to Word, merge, compress and more',
+			'Convert and edit PDFs with the conv2pdf API: Office documents, images and e-books to PDF, PDF to Word, merge, compress and more',
 		defaults: {
 			name: 'conv2pdf',
 		},
@@ -242,6 +246,10 @@ export class Conv2pdf implements INodeType {
 				}
 				const fields = toolFields.call(this, operation, i);
 				const options = this.getNodeParameter('options', i, {}) as ConvertOptions;
+				// The tools behind these operations open a protected PDF with its password.
+				if (options.pdfPassword && PDF_PASSWORD_OPERATIONS.includes(operation)) {
+					fields.password = options.pdfPassword;
+				}
 				const output = await convert.call(this, spec.tool, files, fields, options, i);
 				returnData.push({ ...output, pairedItem: { item: i } });
 			} catch (error) {

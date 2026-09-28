@@ -111,15 +111,15 @@ const MESSAGES: Record<string, [message: string, description?: string]> = {
 	],
 	empty_file: ['The file is empty'],
 	password_protected: [
-		'The PDF is protected with a password',
-		'Remove the password first with the PDF > Unlock operation.',
+		'The file is protected with a password',
+		'For a PDF, remove the password first with the PDF > Unlock operation. A DRM-protected e-book or a locked iWork document cannot be converted.',
 	],
 	needs_password: [
-		'The PDF is protected with a password',
-		'Remove the password first with the PDF > Unlock operation.',
+		'The PDF asks for a password to open',
+		'Enter it in Options > PDF Password, or in the Password field of the Unlock operation.',
 	],
 	wrong_password: ['Wrong password for this PDF'],
-	password_too_short: ['The password must be at least 4 characters long'],
+	password_too_short: ['The password must be at least 6 characters long'],
 	password_too_long: ['The password is too long', 'Use 64 characters at most.'],
 	pdf_already_protected: ['This PDF is already protected with a password'],
 	pdf_not_protected: ['This PDF has no password to remove'],
@@ -129,6 +129,11 @@ const MESSAGES: Record<string, [message: string, description?: string]> = {
 	],
 	pdf_too_many_pages: ['The PDF has too many pages for this operation'],
 	too_many_pages: ['The document has too many pages for this operation'],
+	epub_blank_output: [
+		'This e-book cannot be converted',
+		'Its pages are full-screen images (comics, picture books, manga), and their layout does not survive the conversion to PDF.',
+	],
+	epub_too_long: ['The e-book is too long', 'conv2pdf converts up to 1,500 pages at once.'],
 	invalid_page_range: [
 		'Invalid page range',
 		'Use page numbers and ranges, for example 1-5,7,10-12.',
@@ -147,6 +152,16 @@ const MESSAGES: Record<string, [message: string, description?: string]> = {
 	job_deleted: ['The conversion was deleted'],
 };
 
+// What conv2pdf found in a file that does not match the operation (`detected_type`).
+const CONTENT_HINTS: Record<string, string> = {
+	epub: 'This file is an EPUB e-book: use the E-Book > Convert to PDF operation.',
+	iwork_numbers:
+		'This file is a Numbers spreadsheet, which conv2pdf does not convert. Open it in Numbers and choose File > Export To > PDF.',
+	iwork_keynote:
+		'This file is a Keynote presentation, which conv2pdf does not convert. Open it in Keynote and choose File > Export To > PDF.',
+	iwork: 'conv2pdf converts Apple Pages documents only, named with their .pages extension.',
+};
+
 const stopErrors = new WeakSet<NodeApiError>();
 
 export function apiError(
@@ -156,9 +171,14 @@ export function apiError(
 ): NodeApiError {
 	const body = jsonBody(response);
 	const code = errorCode(response);
-	const [message, description] = (code && MESSAGES[code]) || [
+	const [message, generalDescription] = (code && MESSAGES[code]) || [
 		code ? `conv2pdf error: ${code}` : `conv2pdf returned HTTP ${response.statusCode}`,
 	];
+	const detected = String(body.detected_type);
+	const description =
+		code === 'unsupported_content' && Object.prototype.hasOwnProperty.call(CONTENT_HINTS, detected)
+			? CONTENT_HINTS[detected]
+			: generalDescription;
 	const error = new NodeApiError(this.getNode(), body as JsonObject, {
 		message,
 		description,
