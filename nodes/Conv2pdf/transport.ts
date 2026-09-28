@@ -76,7 +76,7 @@ const MESSAGES: Record<string, [message: string, description?: string]> = {
 	missing_bearer_token: ['Missing conv2pdf API key'],
 	invalid_api_key: [
 		'Invalid conv2pdf API key',
-		'Check the API key in the conv2pdf credential. You can create one in your conv2pdf dashboard.',
+		'Check the API key in the conv2pdf credential. You can create a new one in the Developer tab of your conv2pdf dashboard.',
 	],
 	account_not_provisioned: ['This API key has no conv2pdf API account'],
 	quota_exceeded: [

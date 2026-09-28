@@ -32,7 +32,7 @@ Follow the [community nodes installation guide](https://docs.n8n.io/integrations
 ## Credentials
 
 1. Create an account on [conv2pdf.com](https://conv2pdf.com/en/api/). The Dev plan includes 300 free conversions, valid for 12 months; see [pricing](https://conv2pdf.com/en/api/pricing/) for the paid plans.
-2. Create an API key, which starts with `cpdf_live_`, from the API section of your dashboard.
+2. Create an API key, which starts with `cpdf_live_`, in the **Developer** tab of your dashboard. conv2pdf shows it only once, at creation.
 3. In n8n, create a **Conv2pdf API** credential and paste the key. The credential test reads your quota, which uses no conversion.
 
 ## Usage

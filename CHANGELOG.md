@@ -6,6 +6,7 @@
 - **Office Document > Convert to PDF** also converts Apple Pages documents.
 - **Options > PDF Password** opens a PDF that asks for a password on Add Page Numbers, Add Watermark, Compress, Convert to Images, Convert to Word, Extract Pages and Rotate.
 - **PDF > Unlock** takes an empty password, for a PDF that only restricts printing or copying.
+- The credential and the invalid key message point to the **Developer** tab of the dashboard, where a key is created and shown only once.
 - The Protect password needs 6 characters, as the API requires. A missing PDF password, a DRM-protected e-book and a Numbers or Keynote file get their own messages.
 
 ## 1.0.1 (2026-10-09)

@@ -28,7 +28,7 @@ export class Conv2pdfApi implements ICredentialType {
 			default: '',
 			placeholder: 'cpdf_live_...',
 			description:
-				'Your conv2pdf API key. Create one from the API section of your conv2pdf dashboard.',
+				'Your conv2pdf API key. Create one in the Developer tab of your conv2pdf dashboard: it is shown only once, at creation.',
 		},
 	];
 
