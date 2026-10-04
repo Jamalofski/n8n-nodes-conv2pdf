@@ -1,6 +1,6 @@
 # n8n-nodes-conv2pdf
 
-Official [n8n](https://n8n.io) node for the [conv2pdf API](https://conv2pdf.com/en/api/): convert Word, Excel, PowerPoint, Pages, images and e-books to PDF, convert PDF to Word, and merge, split, compress, protect, rotate or number PDFs, straight from your workflows. Processing runs on OVH servers in Gravelines, France: no transfer outside the EU, no US service in the chain.
+Official [n8n](https://n8n.io) node for the [conv2pdf API](https://conv2pdf.com/en/api/): convert Word, Excel, PowerPoint, Pages, images and e-books to PDF, convert PDF to Word, and merge, split, compress, protect, rotate or number PDFs, straight from your workflows. Processing runs on OVHcloud servers in France: no transfer outside the EU, no US service in the chain.
 
 [Installation](#installation) · [Operations](#operations) · [Credentials](#credentials) · [Usage](#usage) · [Output](#output) · [Compatibility](#compatibility) · [Resources](#resources)
 
