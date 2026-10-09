@@ -326,3 +326,13 @@ test('reads the output file name from Content-Disposition', () => {
 	assert.equal(fileNameFromDisposition('attachment; filename="plain.pdf"'), 'plain.pdf');
 	assert.equal(fileNameFromDisposition(undefined), undefined);
 });
+
+// n8n's reviewers require the full identifier, `<package name>.<node name>`, although
+// the documentation and the starter template still show the package name alone.
+test('names the node by its full identifier in the codex file', () => {
+	const codex = require('../dist/nodes/Conv2pdf/Conv2pdf.node.json');
+	const { name: packageName } = require('../package.json');
+
+	assert.equal(codex.node, `${packageName}.${new Conv2pdf().description.name}`);
+	assert.equal(codex.node, NODE.type);
+});
