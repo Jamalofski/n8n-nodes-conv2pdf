@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1 (2026-10-09)
+
+- The codex file names the node by its full identifier, `n8n-nodes-conv2pdf.conv2pdf`, as n8n's review asks. No change to the node itself.
+
 ## 1.0.0 (2026-09-26)
 
 First release.
