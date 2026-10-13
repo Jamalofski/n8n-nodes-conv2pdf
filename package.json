@@ -22,10 +22,10 @@
 	},
 	"repository": {
 		"type": "git",
-		"url": "git+https://github.com/jamalofski/n8n-nodes-conv2pdf.git"
+		"url": "git+https://github.com/Jamalofski/n8n-nodes-conv2pdf.git"
 	},
 	"bugs": {
-		"url": "https://github.com/jamalofski/n8n-nodes-conv2pdf/issues"
+		"url": "https://github.com/Jamalofski/n8n-nodes-conv2pdf/issues"
 	},
 	"scripts": {
 		"build": "n8n-node build",
