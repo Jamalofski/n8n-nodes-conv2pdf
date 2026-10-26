@@ -14,13 +14,47 @@ on:
     tags:
       # Matches 1.0.0, 1.2.3, 2.0.0-rc.1, etc.
       - '*.*.*'
+  # Run by hand: checks the trusted publisher without publishing anything.
+  workflow_dispatch:
 
 permissions:
   contents: read
 
 jobs:
+  # npm reports a refused OIDC exchange as ENEEDAUTH ("need auth"), without its reason
+  # (npm/cli#9088). This job makes the exchange alone, from this same workflow file as
+  # the trusted publisher requires, and prints npm's answer and the claims it judged.
+  # The npm token of a successful exchange is never printed and expires on its own.
+  check-trusted-publisher:
+    name: Check the trusted publisher
+    if: github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Exchange a GitHub OIDC token with npm
+        run: |
+          set -euo pipefail
+          package='n8n-nodes-conv2pdf'
+          id_token=$(curl -sS -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=npm:registry.npmjs.org" | jq -r .value)
+          echo "::add-mask::$id_token"
+          echo 'Claims of the GitHub token:'
+          ID_TOKEN="$id_token" node -e 'console.log(Buffer.from(process.env.ID_TOKEN.split(".")[1], "base64url").toString())' \
+            | jq '{repository, repository_owner, repository_owner_id, workflow_ref, job_workflow_ref, ref, environment}'
+          status=$(curl -sS -o answer.json -w '%{http_code}' -X POST \
+            -H "Authorization: Bearer $id_token" \
+            "https://registry.npmjs.org/-/npm/v1/oidc/token/exchange/package/$package")
+          echo "npm answered HTTP $status:"
+          jq 'del(.token)' answer.json 2>/dev/null || head -c 500 answer.json
+          rm -f answer.json
+
   publish:
     name: Publish to npm
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
 
     permissions:
