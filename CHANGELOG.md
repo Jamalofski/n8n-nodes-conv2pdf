@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-10-26)
 
 The node now covers all 19 tools of the conv2pdf API.
 
