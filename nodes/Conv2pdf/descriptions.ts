@@ -1,6 +1,6 @@
 import type { INodeProperties } from 'n8n-workflow';
 
-export type FileResource = 'document' | 'ebook' | 'image' | 'pdf';
+export type FileResource = 'document' | 'ebook' | 'image' | 'pdf' | 'webPage';
 
 export interface OperationSpec {
 	/** The conv2pdf tool behind the operation: the `:tool` of POST /v1/convert/:tool. */
@@ -8,6 +8,8 @@ export interface OperationSpec {
 	name: string;
 	action: string;
 	description: string;
+	/** The tool takes a web page address in the `url` field instead of a file. */
+	noFile?: boolean;
 }
 
 // One operation per conv2pdf tool, so each one shows up as its own action in the
@@ -16,9 +18,16 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 	document: {
 		convertToPdf: {
 			tool: 'office-to-pdf',
-			name: 'Convert to PDF',
+			name: 'Convert Office Document to PDF',
 			action: 'Convert an Office document to PDF',
 			description: 'Convert a Word, Excel, PowerPoint, OpenDocument or Apple Pages file to PDF',
+		},
+		postscriptToPdf: {
+			tool: 'ps-to-pdf',
+			name: 'Convert PostScript to PDF',
+			action: 'Convert a PostScript or EPS file to PDF',
+			description:
+				'Convert a PostScript (.ps) or EPS file to PDF, keeping its text as text and its drawings as vectors',
 		},
 	},
 	ebook: {
@@ -81,10 +90,10 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 			description: 'Convert a PDF to an editable Word (DOCX) document',
 		},
 		extractPages: {
-			tool: 'split-pdf',
+			tool: 'extract-pages',
 			name: 'Extract Pages',
 			action: 'Extract pages from a PDF',
-			description: 'Split a PDF by extracting the pages you choose into a new PDF',
+			description: 'Copy the pages you choose, in the order you write them, into a new PDF',
 		},
 		merge: {
 			tool: 'merge-pdf',
@@ -97,6 +106,12 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 			name: 'Protect',
 			action: 'Protect a PDF with a password',
 			description: 'Encrypt a PDF with a password and optional restrictions',
+		},
+		split: {
+			tool: 'split-pdf',
+			name: 'Split',
+			action: 'Split a PDF into one file per page',
+			description: 'Put every page of a PDF in its own PDF file, returned in a ZIP file',
 		},
 		rotate: {
 			tool: 'rotate-pdf',
@@ -111,6 +126,21 @@ export const OPERATIONS: Record<FileResource, Record<string, OperationSpec>> = {
 			description: 'Remove the password from a PDF you know the password of',
 		},
 	},
+	webPage: {
+		convertUrlToPdf: {
+			tool: 'url-to-pdf',
+			name: 'Convert URL to PDF',
+			action: 'Convert a web page to PDF',
+			description: 'Convert the web page at an address to PDF, as it prints in a browser',
+			noFile: true,
+		},
+		convertHtmlToPdf: {
+			tool: 'html-to-pdf',
+			name: 'Convert HTML File to PDF',
+			action: 'Convert an HTML file to PDF',
+			description: 'Convert an HTML file to PDF, as it prints in a browser',
+		},
+	},
 };
 
 /** The PDF operations whose tool opens a protected PDF when it gets its password. */
@@ -122,13 +152,15 @@ export const PDF_PASSWORD_OPERATIONS = [
 	'convertToWord',
 	'extractPages',
 	'rotate',
+	'split',
 ];
 
 const RESOURCE_OPTIONS = [
-	{ name: 'Office Document', value: 'document' },
+	{ name: 'Document', value: 'document' },
 	{ name: 'E-Book', value: 'ebook' },
 	{ name: 'Image', value: 'image' },
 	{ name: 'PDF', value: 'pdf' },
+	{ name: 'Web Page', value: 'webPage' },
 	{ name: 'Account', value: 'account' },
 ];
 
@@ -145,12 +177,19 @@ const show = (resource: FileResource, operation: string[]) => ({
 	show: { resource: [resource], operation },
 });
 
-// Every file operation reads one binary field, except Merge, which has its own inputs.
+// Every file operation reads one binary field, except Merge, which has its own inputs,
+// and Convert URL to PDF, which takes an address and no file.
+const fileOperations = (resource: FileResource) =>
+	Object.entries(OPERATIONS[resource])
+		.filter(([operation, spec]) => operation !== 'merge' && !spec.noFile)
+		.map(([operation]) => operation);
+
 const SINGLE_FILE_OPERATIONS: Array<[FileResource, string[]]> = [
-	['document', Object.keys(OPERATIONS.document)],
-	['ebook', Object.keys(OPERATIONS.ebook)],
-	['image', Object.keys(OPERATIONS.image)],
-	['pdf', Object.keys(OPERATIONS.pdf).filter((operation) => operation !== 'merge')],
+	['document', fileOperations('document')],
+	['ebook', fileOperations('ebook')],
+	['image', fileOperations('image')],
+	['pdf', fileOperations('pdf')],
+	['webPage', fileOperations('webPage')],
 ];
 
 export const properties: INodeProperties[] = [
@@ -197,6 +236,15 @@ export const properties: INodeProperties[] = [
 		displayOptions: { show: { resource: ['pdf'] } },
 		options: operationOptions('pdf'),
 		default: 'merge',
+	},
+	{
+		displayName: 'Operation',
+		name: 'operation',
+		type: 'options',
+		noDataExpression: true,
+		displayOptions: { show: { resource: ['webPage'] } },
+		options: operationOptions('webPage'),
+		default: 'convertUrlToPdf',
 	},
 	{
 		displayName: 'Operation',
@@ -275,8 +323,22 @@ export const properties: INodeProperties[] = [
 		required: true,
 		default: '',
 		placeholder: '1-5,7,10-12',
-		description: 'The pages to keep, as page numbers and ranges separated by commas',
+		description:
+			'The pages to keep, in the order you want them, as page numbers and ranges separated by commas. 11- runs to the last page.',
 		displayOptions: show('pdf', ['extractPages']),
+	},
+
+	// Convert URL to PDF
+	{
+		displayName: 'URL',
+		name: 'url',
+		type: 'string',
+		required: true,
+		default: '',
+		placeholder: 'https://example.com/page',
+		description:
+			'The address of the public web page to convert, starting with https:// or http://. The page is opened without signing in.',
+		displayOptions: show('webPage', ['convertUrlToPdf']),
 	},
 
 	// Compress

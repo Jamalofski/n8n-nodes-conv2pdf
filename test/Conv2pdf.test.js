@@ -144,7 +144,13 @@ test('sends the fields of the operation', async () => {
 
 test('maps each operation to its conv2pdf tool and fields', async () => {
 	const cases = [
-		[{ resource: 'pdf', operation: 'extractPages', ranges: '1-3,7' }, 'split-pdf', { ranges: '1-3,7' }],
+		[{ resource: 'pdf', operation: 'extractPages', ranges: '1-3,7' }, 'extract-pages', { ranges: '1-3,7' }],
+		[{ resource: 'pdf', operation: 'split' }, 'split-pdf', {}],
+		[
+			{ resource: 'pdf', operation: 'split', options: { pdfPassword: 'open sesame' } },
+			'split-pdf',
+			{ password: 'open sesame' },
+		],
 		[{ resource: 'pdf', operation: 'compress', quality: 'low' }, 'compress-pdf', { quality: 'low' }],
 		[{ resource: 'pdf', operation: 'rotate', rotation: '180' }, 'rotate-pdf', { rotation: '180' }],
 		[{ resource: 'pdf', operation: 'addWatermark', text: 'DRAFT' }, 'watermark-pdf', { text: 'DRAFT' }],
@@ -173,6 +179,8 @@ test('maps each operation to its conv2pdf tool and fields', async () => {
 			{ password: 'new-password' },
 		],
 		[{ resource: 'ebook', operation: 'convertToPdf' }, 'epub-to-pdf', {}],
+		[{ resource: 'document', operation: 'postscriptToPdf' }, 'ps-to-pdf', {}],
+		[{ resource: 'webPage', operation: 'convertHtmlToPdf' }, 'html-to-pdf', {}],
 		[{ resource: 'image', operation: 'convertToPdf' }, 'image-to-pdf', {}],
 		[{ resource: 'image', operation: 'heicToJpg' }, 'heic-to-jpg', {}],
 		[{ resource: 'image', operation: 'heicToPdf' }, 'heic-to-pdf', {}],
@@ -303,7 +311,8 @@ test('shows the input binary field on every operation that reads one file', () =
 		(property) => property.name === 'binaryPropertyName' && !property.displayOptions.show.mergeMode,
 	);
 	for (const [resource, operations] of Object.entries(OPERATIONS)) {
-		for (const operation of Object.keys(operations).filter((name) => name !== 'merge')) {
+		const readOne = Object.entries(operations).filter(([name, spec]) => name !== 'merge' && !spec.noFile);
+		for (const [operation] of readOne) {
 			const shown = fields.some(
 				(field) =>
 					field.displayOptions.show.resource.includes(resource) &&
@@ -328,6 +337,7 @@ test('offers the PDF password only on the operations whose tool opens a protecte
 		'convertToWord',
 		'extractPages',
 		'rotate',
+		'split',
 	]);
 });
 
@@ -400,4 +410,91 @@ test('names the node by its full identifier in the codex file', () => {
 
 	assert.equal(codex.node, `${packageName}.${new Conv2pdf().description.name}`);
 	assert.equal(codex.node, NODE.type);
+});
+
+// The 19 tools of POST /v1/convert/:tool on 26/10/2026: a tool added to the API and
+// forgotten here would only show up as a missing action in n8n.
+test('has an operation for every tool of the conv2pdf API', () => {
+	const tools = Object.values(OPERATIONS).flatMap((operations) =>
+		Object.values(operations).map((spec) => spec.tool),
+	);
+	assert.deepEqual([...tools].sort(), [
+		'compress-pdf', 'epub-to-pdf', 'extract-pages', 'heic-to-jpg', 'heic-to-pdf',
+		'html-to-pdf', 'image-to-pdf', 'merge-pdf', 'office-to-pdf', 'page-numbers-pdf',
+		'pdf-to-image', 'pdf-to-word', 'protect-pdf', 'ps-to-pdf', 'rotate-pdf',
+		'split-pdf', 'unlock-pdf', 'url-to-pdf', 'watermark-pdf',
+	]);
+});
+
+test('converts a web page from its address, without sending a file', async () => {
+	const { promise, calls } = run({
+		files: [[]],
+		parameters: { resource: 'webPage', operation: 'convertUrlToPdf', url: '  https://example.com/page  ' },
+	});
+	const [item] = await promise;
+
+	assert.equal(route(calls[0]), `POST ${BASE}/convert/url-to-pdf`);
+	const form = calls[0].options.body;
+	assert.deepEqual(form.getAll('file'), []);
+	assert.equal(form.get('url'), 'https://example.com/page');
+	assert.equal(item.binary.data.fileName, 'report.pdf');
+	const urlField = new Conv2pdf().description.properties.find((property) => property.name === 'url');
+	assert.deepEqual(urlField.displayOptions.show, { resource: ['webPage'], operation: ['convertUrlToPdf'] });
+});
+
+test('returns the ZIP archive of a split as it is', async () => {
+	const conv2pdf = api();
+	const { promise } = run({
+		files: [['book.pdf']],
+		parameters: { resource: 'pdf', operation: 'split', binaryPropertyName: 'data' },
+		respond: (options) =>
+			options.method === 'GET' ? file('PK', 'book-pages.zip', 'application/zip') : conv2pdf(options),
+	});
+	const [item] = await promise;
+
+	assert.equal(item.binary.data.fileName, 'book-pages.zip');
+	assert.equal(item.binary.data.mimeType, 'application/zip');
+});
+
+test('explains why an address or a page range was refused', async () => {
+	const cases = [
+		[
+			{ resource: 'webPage', operation: 'convertUrlToPdf', url: 'ftp://example.com/' },
+			json(422, { error: 'invalid_url', field: 'url', cause: 'scheme' }),
+			'This web page address cannot be converted',
+			/Only http and https/,
+		],
+		[
+			{ resource: 'webPage', operation: 'convertUrlToPdf', url: 'https://example.com/gone' },
+			json(422, { error: 'url_http_error', http_status: 404 }),
+			'The web page answered with an error',
+			/HTTP 404/,
+		],
+		[
+			{ resource: 'pdf', operation: 'extractPages', ranges: '12', binaryPropertyName: 'data' },
+			json(400, { error: 'invalid_page_range', cause: 'beyond_last_page', range: '12', total_pages: 10 }),
+			'Invalid page range',
+			/"12": the PDF has 10 pages/,
+		],
+		[
+			{ resource: 'document', operation: 'convertToPdf', binaryPropertyName: 'data' },
+			json(415, { error: 'unsupported_content', detected_type: 'postscript' }),
+			'The file does not match this operation',
+			/Convert PostScript to PDF/,
+		],
+		[
+			{ resource: 'pdf', operation: 'split', binaryPropertyName: 'data' },
+			json(422, { error: 'pdf_single_page' }),
+			'This PDF has a single page: there is nothing to split',
+			undefined,
+		],
+	];
+	for (const [parameters, response, message, description] of cases) {
+		const { promise } = run({ files: [['input.bin']], parameters, respond: () => response });
+		await assert.rejects(promise, (error) => {
+			assert.equal(error.message, message);
+			if (description) assert.match(error.description, description);
+			return true;
+		});
+	}
 });

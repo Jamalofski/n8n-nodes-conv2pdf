@@ -79,6 +79,8 @@ function toolFields(this: IExecuteFunctions, operation: string, itemIndex: numbe
 			};
 		case 'convertToImages':
 			return { format: this.getNodeParameter('imageFormat', itemIndex) as string };
+		case 'convertUrlToPdf':
+			return { url: (this.getNodeParameter('url', itemIndex) as string).trim() };
 		default:
 			return {};
 	}
@@ -146,7 +148,7 @@ export class Conv2pdf implements INodeType {
 		version: 1,
 		subtitle: '={{$parameter["operation"] + ": " + $parameter["resource"]}}',
 		description:
-			'Convert and edit PDFs with the conv2pdf API: Office documents, images and e-books to PDF, PDF to Word, merge, compress and more',
+			'Convert and edit PDFs with the conv2pdf API: Office documents, images, e-books, PostScript, HTML files and web pages to PDF, PDF to Word, merge, split, compress and more',
 		defaults: {
 			name: 'conv2pdf',
 		},
@@ -240,6 +242,9 @@ export class Conv2pdf implements INodeType {
 						.filter((name) => name !== '');
 					files = [];
 					for (const name of names) files.push(await readFile.call(this, i, name));
+				} else if (spec.noFile) {
+					// Convert URL to PDF: the address goes in the `url` field, and no file is sent.
+					files = [];
 				} else {
 					const propertyName = this.getNodeParameter('binaryPropertyName', i) as string;
 					files = [await readFile.call(this, i, propertyName)];

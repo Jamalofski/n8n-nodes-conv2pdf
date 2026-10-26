@@ -139,9 +139,44 @@ const MESSAGES: Record<string, [message: string, description?: string]> = {
 		'Use page numbers and ranges, for example 1-5,7,10-12.',
 	],
 	unsupported_characters: ['The watermark text contains characters that cannot be rendered'],
+	pdf_single_page: ['This PDF has a single page: there is nothing to split'],
+	ps_blank_output: [
+		'This PostScript file draws no page',
+		'A file that only holds a font or a library of procedures, or whose program fails, produces no page.',
+	],
+	html_blank_output: [
+		'This HTML file prints as a blank page',
+		'Nothing in it is drawn when printed: the file may be empty, or hide its content for printing.',
+	],
+	invalid_url: ['This web page address cannot be converted'],
+	url_unreachable: [
+		'The web page could not be reached',
+		'Check the address, and that the site is online and public.',
+	],
+	url_http_error: [
+		'The web page answered with an error',
+		'Check that the address opens in a browser without signing in: conv2pdf opens the page without a session.',
+	],
+	url_blocked: [
+		'The web page leads to a private network address',
+		'conv2pdf only opens public web pages: the page, or one of its redirects, points to a private or local network.',
+	],
+	url_blank_page: [
+		'The web page prints as a blank page',
+		'Nothing is drawn when the page is printed: its content may need a login, or be hidden for printing.',
+	],
+	no_file_expected: ['Convert URL to PDF takes a web page address, not a file'],
+	field_required: ['A required field is missing'],
+	source_unreadable: ['conv2pdf could not read this file', 'The file may be damaged or truncated.'],
+	tool_not_found: [
+		'This conv2pdf operation is not available',
+		'The conv2pdf API does not offer this tool yet. Check the node version against the conv2pdf API documentation.',
+	],
+	job_not_found: ['The conversion was not found'],
+	job_not_ready: ['The converted file is not ready'],
 	output_too_large: ['The result is too large to be delivered'],
 	conversion_failed: [
-		'conv2pdf could not process this file',
+		'conv2pdf could not complete this conversion',
 		'Failed conversions do not count against your quota.',
 	],
 	conversion_timeout: [
@@ -160,7 +195,43 @@ const CONTENT_HINTS: Record<string, string> = {
 	iwork_keynote:
 		'This file is a Keynote presentation, which conv2pdf does not convert. Open it in Keynote and choose File > Export To > PDF.',
 	iwork: 'conv2pdf converts Apple Pages documents only, named with their .pages extension.',
+	postscript: 'This file is PostScript or EPS: use the Document > Convert PostScript to PDF operation.',
+	html: 'This file is an HTML page: use the Web Page > Convert HTML File to PDF operation.',
+	pdf: 'This file is already a PDF: use one of the PDF operations.',
 };
+
+// Why an address was refused (`cause` of `invalid_url`).
+const URL_CAUSES: Record<string, string> = {
+	malformed: 'Write the full address, starting with https:// or http://.',
+	scheme: 'Only http and https addresses can be converted.',
+	credentials:
+		'Remove the user name and password from the address: conv2pdf opens the page without signing in.',
+	private_address: 'conv2pdf only opens public web pages, not addresses of a private or local network.',
+	local_name: 'conv2pdf only opens public web pages, not names of a local network.',
+	too_long: 'The address is too long.',
+};
+
+/** The description of a page range or address refusal, from the `cause` the API returns. */
+function causeDescription(code: string | undefined, body: IDataObject): string | undefined {
+	const cause = String(body.cause);
+	if (code === 'invalid_url') return URL_CAUSES[cause];
+	if (code === 'url_http_error' && Number.isInteger(Number(body.http_status))) {
+		return `The page answered HTTP ${Number(body.http_status)}. ${MESSAGES.url_http_error[1]}`;
+	}
+	if (code !== 'invalid_page_range') return undefined;
+	const range = typeof body.range === 'string' && body.range !== '' ? `"${body.range}": ` : '';
+	if (cause === 'page_zero') return `${range}page numbers start at 1.`;
+	if (cause === 'beyond_last_page') {
+		const total = Number(body.total_pages);
+		return Number.isFinite(total) && total > 0
+			? `${range}the PDF has ${total} pages.`
+			: `${range}this page is beyond the last page of the PDF.`;
+	}
+	if (cause === 'whole_document') {
+		return 'These pages are the whole document, in its order: the result would be the same PDF.';
+	}
+	return undefined;
+}
 
 const stopErrors = new WeakSet<NodeApiError>();
 
@@ -178,7 +249,7 @@ export function apiError(
 	const description =
 		code === 'unsupported_content' && Object.prototype.hasOwnProperty.call(CONTENT_HINTS, detected)
 			? CONTENT_HINTS[detected]
-			: generalDescription;
+			: (causeDescription(code, body) ?? generalDescription);
 	const error = new NodeApiError(this.getNode(), body as JsonObject, {
 		message,
 		description,

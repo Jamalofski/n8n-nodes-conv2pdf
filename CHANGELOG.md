@@ -2,9 +2,17 @@
 
 ## 1.1.0 (unreleased)
 
+The node now covers all 19 tools of the conv2pdf API.
+
 - **E-Book > Convert to PDF** converts an EPUB e-book to PDF on A4 pages, with its table of contents and links.
-- **Office Document > Convert to PDF** also converts Apple Pages documents.
-- **Options > PDF Password** opens a PDF that asks for a password on Add Page Numbers, Add Watermark, Compress, Convert to Images, Convert to Word, Extract Pages and Rotate.
+- **Document > Convert PostScript to PDF** converts a PostScript (`.ps`) or EPS file, keeping its text as text and its drawings as vectors.
+- **Web Page > Convert URL to PDF** converts the public web page at an address, with no input file, and **Web Page > Convert HTML File to PDF** converts an HTML file. Both print the page as a browser would.
+- **PDF > Split** puts every page of a PDF in its own PDF file, returned in a ZIP file.
+- **PDF > Extract Pages** calls the `extract-pages` tool of the API, and keeps the pages in the order you write them.
+- The Office Document resource is now called Document, and its operation Convert Office Document to PDF. Workflows built with 1.0 keep working unchanged.
+- **Document > Convert Office Document to PDF** also converts Apple Pages documents.
+- **Options > PDF Password** opens a PDF that asks for a password on Add Page Numbers, Add Watermark, Compress, Convert to Images, Convert to Word, Extract Pages, Rotate and Split.
+- A refused web page address or page range, a blank page and a single-page PDF to split get their own messages, which say what to change. The README now says which failures count against the quota.
 - **PDF > Unlock** takes an empty password, for a PDF that only restricts printing or copying.
 - The credential and the invalid key message point to the **Developer** tab of the dashboard, where a key is created and shown only once.
 - The Protect password needs 6 characters, as the API requires. A missing PDF password, a DRM-protected e-book and a Numbers or Keynote file get their own messages.
